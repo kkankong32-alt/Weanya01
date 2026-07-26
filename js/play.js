@@ -69,7 +69,7 @@ var ST = {
      actually safe to stand on — the one hazard where a misleading silhouette would
      teach the wrong lesson. Erring slightly wide is deliberate and forgiving; the
      hitbox is always the smaller of the two. */
-  hazard_glassshard_styled: [18, 10],   // ink 1.83:1 -> ~18.3 x 10  (hitbox 13x11)
+  hazard_glassshard_styled: [24, 13],   // ink 1.83:1 -> ~23.8 x 13  (hitbox 17x14)
   hazard_ember_styled:      [14, 12],   // ink 1.14:1 -> ~13.7 x 12  (hitbox 11x11)
   hazard_fallingjar_styled: [15, 15],   // ink 0.98:1 -> ~14.6 x 15  (hitbox 11x13)
   hazard_rumor_styled:      [26, 21]    // ink 1.26:1 -> ~26.5 x 21  (hitbox 22x18)
@@ -109,6 +109,15 @@ var WATER_MUL = { g: 0.72, term: 0.6, jump: 0.92 };
    cover it with a little to spare so no background shows beside the mouth. Height
    follows the artwork's own ratio, so the tube is never stretched. */
 var PIPE_W = 36;
+
+/* How far a ground-resting hazard beds INTO the floor, in game px.
+   Aligning its bounding box exactly with the tile top is not enough: a floor tile
+   is drawn with a 1px dark outline along its top edge and the light surface only
+   begins below that, so a sprite whose last row lands on the outline reads as
+   hovering over the ground. Sinking it a couple of pixels puts the base inside the
+   visible surface, which is what "resting on the floor" actually looks like.
+   Collision is untouched — this is a drawing offset only. */
+var SIT_SINK = 2.5;
 
 /* Character abilities are read through here, never baked into K. If the cast
    module has not loaded, every lookup returns the neutral default, so the game
@@ -818,7 +827,12 @@ Orb.prototype.draw = function (x, cam) {
   var bob = this.popping > 0 ? 0 : Math.sin(this.t * 0.5) * 1.3;   // gentle float
   var cx = this.x - cam.x, cy = this.y - cam.y + bob;
   if (img) {
-    var w = ST.orb[0] * s, h = ST.orb[1] * s;
+    /* Through fit() so the 기억 조각 keeps its artwork's own proportions — the old
+       code forced ST.orb's 16x17.3 box onto whatever image was supplied, which
+       would squash a square pickup. Trimming also means export padding cannot
+       shrink it. */
+    var fo = fit(img, ST.orb);
+    var w = fo.w * s, h = fo.h * s;
     // soft glow behind
     x.save();
     x.globalAlpha = 0.28 + Math.sin(this.t * 1.1) * 0.10;
@@ -829,7 +843,7 @@ Orb.prototype.draw = function (x, cam) {
     x.save();
     x.translate(cx, cy);
     x.scale(Math.cos(this.t * 0.5) * 0.12 + 0.98, 1);     // slow turn
-    x.drawImage(img, -w / 2, -h / 2, w, h);
+    x.drawImage(img, fo.sx, fo.sy, fo.sw, fo.sh, -w / 2, -h / 2, w, h);
     x.restore();
   } else {
     var f = A.orb[Math.floor(this.t) % A.orb.length];
@@ -1345,8 +1359,8 @@ var ETYPE = {
                    breaks instead of thudding.
        rumor       소문 — drifts like redtide; stomping it IS checking it, so it
                    pops. The one hazard you are meant to meet head-on. */
-  glassshard: { w: 13, h: 11, sp: 0,  gravity: false, stomp: false, art: 'hazard_glassshard_styled', still: true },
-  ember:      { w: 11, h: 11, sp: 46, gravity: true,  stomp: true,  art: 'hazard_ember_styled', roll: true, snuff: true },
+  glassshard: { w: 17, h: 14, sp: 0,  gravity: false, stomp: false, art: 'hazard_glassshard_styled', still: true, sits: true },
+  ember:      { w: 11, h: 11, sp: 46, gravity: true,  stomp: true,  art: 'hazard_ember_styled', roll: true, snuff: true, sits: true },
   fallingjar: { w: 11, h: 13, sp: 0,  gravity: false, stomp: false, art: 'hazard_fallingjar_styled', faller: true, glass: true },
   /* The rumour is the one hazard you are meant to seek out and land on, and it was
      smaller than the decorative bubbles drifting behind it — so the thing to aim at
@@ -1518,9 +1532,18 @@ Enemy.prototype.draw = function (x, cam) {
     // whole. Falling back to the hitbox keeps a new hazard drawable without a size.
     var fe = fit(styled, ST[artKey] || ST[artKey.replace(/^st_/, '')] || [this.w, this.h]);
     var sw = fe.w, sh = fe.h;
-    var cx = this.x + this.w / 2 - cam.x, cy = this.y + this.h / 2 - cam.y;
+    var cx = this.x + this.w / 2 - cam.x;
+    /* Anchoring. The code-drawn fallback has always put a hazard's BOTTOM on the
+       bottom of its hitbox, but this styled path centred the art on the hitbox
+       instead — so any artwork shorter than its box hovered above the floor, which
+       is what made the glass shards look like they were floating. Hazards that rest
+       on the ground (`sits`) are now bottom-anchored to match; the ones that fly,
+       drift or drop stay centred, which is right for them. */
+    var cy = d.sits
+      ? (this.y + this.h + SIT_SINK - cam.y) - sh / 2
+      : this.y + this.h / 2 - cam.y;
     // things resting on the floor or dropping under script must not float
-    var bob = (d.still || d.faller) ? 0 : Math.sin(this.t * 2.2) * 1.1;
+    var bob = (d.still || d.faller || d.sits) ? 0 : Math.sin(this.t * 2.2) * 1.1;
     x.save();
     if (this.squashT > 0) x.globalAlpha = Math.max(0, this.squashT / 0.35);
     // data errors glitch-jitter; blobs drift softly

@@ -39,6 +39,10 @@ var ART = {
   loading_backyard_zone:    'image/loading_backyard_zone.png',
   loading_chatspace_zone:   'image/loading_chatspace_zone.png',
   loading_truthroom_zone:   'image/loading_truthroom_zone.png',
+  /* 기억 조각 — the collectible. st_orb is the engine's internal name for it (see
+     Orb.draw in play.js); if this file is missing the code-drawn orb in art.js is
+     used instead, so the pickup never disappears. */
+  st_orb: 'image/pickup_memory_gear.png',
   /* hazards — art.js bakes code-drawn twins under these same keys, so a missing
      file costs polish, not the hazard */
   hazard_glassshard_styled: 'image/hazard_glassshard_styled.png',
@@ -88,6 +92,10 @@ function artPath(key) { return ART[key] || null; }
    a flat-coloured tile — never a failed start. */
 var CRITICAL = [
   'tex_labroom_floor', 'world_labroom_bg',
+  /* the 기억 조각 is on screen within seconds of starting and appears constantly,
+     so it is awaited rather than streamed — otherwise the first pickups render as
+     the code-drawn orb and then visibly swap once the real art arrives */
+  'st_orb',
   'st_checkpoint', 'st_console', 'st_switch', 'st_terminal',
   'st_pipe', 'st_portal_base', 'st_portal_ring',
   'hazard_glassshard_styled', 'hazard_fallingjar_styled'
@@ -1412,8 +1420,9 @@ var Game = {
     else { im.removeAttribute('src'); im.style.display = 'none'; }
     $('#clear-facts').innerHTML = def.facts.map(function (f) { return '<p>' + f + '</p>'; }).join('');
     $('#clear-stats').innerHTML =
-      '<span>점수 <b>' + this.score + '</b></span><span>생명 에너지 <b>' + this.orbs + '</b></span>' +
-      '<span>관찰 카드 <b>' + this.cards.length + '</b></span>';
+      '<span>점수 <b>' + this.score + '</b></span>' +
+      '<span>기억 조각 <b>' + this.orbs + '</b></span>' +
+      '<span>확인 카드 <b>' + this.cards.length + '</b></span>';
     UI.openOverlay('scr-clear');
     // always start at the top: a previous stage's scroll position would otherwise
     // carry over and open the next clear screen halfway down
@@ -1590,7 +1599,7 @@ var Game = {
         : '아직 남은 확인 카드는 월드 선택에서 다시 얻을 수 있어요.';
       note.className = 'cards-note' + (got >= totalCards ? ' all' : '');
     }
-    $('#ending-stats').innerHTML = '최종 점수 <b>' + this.score + '</b> · 되찾은 기억 <b>' + this.orbs +
+    $('#ending-stats').innerHTML = '최종 점수 <b>' + this.score + '</b> · 되찾은 기억 조각 <b>' + this.orbs +
       '</b> · 확인 카드 <b>' + got + '/' + totalCards + '</b>';
   },
 
