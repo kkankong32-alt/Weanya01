@@ -13,7 +13,13 @@ body{
   background:#05080f; color:var(--ink); overflow:hidden;
   font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",system-ui,sans-serif;
   -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none;
-  touch-action:none;
+  /* NOT touch-action:none. The browser intersects touch-action down the ancestor
+     chain, so blocking it here vetoed panning inside the dialog scrollers no matter
+     what they asked for — which is half of why the character picker could not be
+     scrolled on a phone. `manipulation` still kills double-tap zoom and the tap
+     delay; the page itself cannot scroll anyway (overflow:hidden + #app is fixed).
+     Gameplay surfaces below opt into touch-action:none individually. */
+  touch-action:manipulation;
 }
 #app{position:fixed;inset:0;display:grid;place-items:center;
   background:radial-gradient(circle at 50% 40%,#132a45 0%,#070c16 70%)}
@@ -27,8 +33,10 @@ body{
   /* scales all UI with the stage: 1cqw-ish via custom prop set in JS */
   font-size:var(--ui, 16px);
 }
-/* rendered at 3x internally with smooth vector art -> let the browser filter it */
-#game{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* rendered at 3x internally with smooth vector art -> let the browser filter it.
+   touch-action:none here (rather than on body) so dragging on the playfield never
+   scrolls or zooms, while dialogs elsewhere stay swipeable. */
+#game{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 
 /* ===== screens ===== */
 .screen{position:absolute;inset:0;display:none;z-index:5}
@@ -437,7 +445,7 @@ body{
    both thumb pads live — and the home indicator runs along the bottom. Without the
    left/right insets the ◀ and ▲ buttons sit under the bezel on a notched phone and
    simply cannot be pressed. */
-#touch{position:absolute;inset:0;z-index:15;pointer-events:none}
+#touch{position:absolute;inset:0;z-index:15;pointer-events:none;touch-action:none}
 .pad-left,.pad-right{position:absolute;bottom:0;display:flex;gap:.5em;align-items:flex-end;
   padding:1em; padding-bottom:max(1em,env(safe-area-inset-bottom))}
 .pad-left{left:0;padding-left:max(1em,env(safe-area-inset-left))}
@@ -828,8 +836,17 @@ body{
 
 /* ===== ending ===== */
 #scr-ending{overflow:hidden}
-.ending-scroll{width:100%;height:100%;overflow-y:auto;display:grid;place-items:center;padding:1em 0;
+/* place-items:center had the same defect as the clear screen: the ending panel is
+   long (badges + four cases + four cards + stats), and once it outgrows the
+   viewport a centred grid child cannot be scrolled back up to — the badges and the
+   title were unreachable. flex + margin:auto centres when it fits and scrolls from
+   the top when it does not. touch-action:pan-y because body disables gestures. */
+.ending-scroll{width:100%;height:100%;overflow-y:auto;overflow-x:hidden;
+  display:flex;padding:1em .6em;
+  padding-bottom:calc(1em + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;
   background:radial-gradient(circle at 50% 30%,#153a55,#050a14 70%)}
+.ending-scroll > *{margin:auto;flex:0 0 auto;max-width:100%}
 /* Badge art is normalised at build time to a square canvas with the emblem at a
    constant 86% — the raw PNGs ranged from 46% to 100% ink, so a fixed CSS width
    made some badges look half the size of others. */
@@ -981,6 +998,70 @@ body{
   .order-slot-txt{font-size:.54em}
   .order-card{padding:.3em .25em}
   .order-card em{font-size:1.1em}
+}
+
+/* ===== dialog screens must always be reachable =====
+   THE BUG THIS FIXES: #stage is locked to 16:9, so a phone held upright gives it
+   only about 220px of height (390x844 -> 390x219). body{overflow:hidden;
+   touch-action:none} and #stage{overflow:hidden} mean nothing scrolls, and
+   .screen.active centres its content — so a panel taller than 220px was clipped at
+   BOTH ends with no way to reach it. On the character picker that put
+   "이 친구로 시작" past the bottom edge, physically unpressable: the game could not
+   be started on a phone at all.
+
+   The clear screen already solved this; every dialog now uses the same pattern:
+     - the screen itself scrolls (not the stage, which must stay clipped),
+     - margin:auto on the panel instead of align-items:center, because a centred
+       flex child taller than its container cannot be scrolled back up to,
+     - touch-action:pan-y, because body disables touch gestures for the game and a
+       scroller has to opt back in or it cannot be swiped,
+     - safe-area padding on all four sides for notched phones. */
+#scr-charselect.active, #scr-worlds.active, #scr-controls.active,
+#scr-sound.active, #scr-pause.active, #scr-mission.active, #scr-error.active{
+  display:flex;
+  overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+  padding:.7em;
+  padding-top:max(.7em,env(safe-area-inset-top));
+  padding-bottom:max(.7em,env(safe-area-inset-bottom));
+  padding-left:max(.7em,env(safe-area-inset-left));
+  padding-right:max(.7em,env(safe-area-inset-right));
+}
+#scr-charselect.active > *, #scr-worlds.active > *, #scr-controls.active > *,
+#scr-sound.active > *, #scr-pause.active > *, #scr-mission.active > *,
+#scr-error.active > *{
+  margin:auto; flex:0 0 auto; max-width:100%;
+}
+/* the mission shell caps itself to 94% of the stage; inside a scroller it should
+   simply be as tall as its content and let the screen do the scrolling */
+#scr-mission.active > .mission-shell{max-height:none}
+
+/* On a phone held upright, reading a dialog through a 220px letterbox is miserable
+   even once it scrolls — so dialogs leave the 16:9 box and use the whole viewport.
+   Only these panels escape; the game canvas keeps its letterbox. z-index stays
+   under #fade (40) so screen transitions still cover them. */
+@media (orientation:portrait), (max-height:430px){
+  #scr-charselect.active, #scr-worlds.active, #scr-controls.active,
+  #scr-sound.active, #scr-pause.active, #scr-mission.active,
+  #scr-clear.active, #scr-ending.active, #scr-error.active{
+    position:fixed; inset:0; z-index:35;
+    max-height:100vh; max-height:100dvh;
+  }
+}
+
+/* Portrait is tall and narrow, so three cards side by side leaves ~110px each.
+   One card per row instead, art beside the text — the same shape the short-landscape
+   rule already uses, for the same reason. */
+@media (orientation:portrait){
+  .char-grid{grid-template-columns:1fr;gap:.4em}
+  .ccard{grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:.6em}
+  .ccard-art{width:4.2em;aspect-ratio:1;max-height:none}
+  .cc-perk{display:block}
+  .char-panel{width:100%;max-width:26em}
+  .world-grid{grid-template-columns:repeat(2,1fr)}
+  .ctrl-grid{grid-template-columns:1fr}
 }
 
 /* ===== fade ===== */
