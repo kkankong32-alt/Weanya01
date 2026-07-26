@@ -17,7 +17,11 @@
 <meta name="theme-color" content="#0a1020">
 <meta name="description" content="왜냐면 과학실 — 아무도 다치지 않았다. 짐작 대신 확인하며 안전과 관찰을 배우는 초등 과학 게임.">
 <title>왜냐면 과학실 — 아무도 다치지 않았다</title>
-<link rel="stylesheet" href="css/style.css">
+<!-- ?v= is a cache buster. GitHub Pages (and phone browsers) hold on to CSS and JS
+     for a long time, so re-uploading a fixed file is NOT enough on its own — the
+     old copy keeps being served and the bug looks unfixed. Bump this number every
+     time css/ or js/ changes and every visitor gets the new files immediately. -->
+<link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
 <div id="app">
@@ -297,12 +301,13 @@
   <p id="rotate-tip">가로로 돌리면 더 넓게 보여요</p>
 </div>
 
-<script src="js/core.js"></script>
-<script src="js/player_atlas.js"></script>
-<script src="js/art.js"></script>
-<script src="js/level.js"></script>
-<script src="js/play.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/main.js"></script>
+<!-- Same cache buster as the stylesheet above — keep every ?v= here in step with it. -->
+<script src="js/core.js?v=2"></script>
+<script src="js/player_atlas.js?v=2"></script>
+<script src="js/art.js?v=2"></script>
+<script src="js/level.js?v=2"></script>
+<script src="js/play.js?v=2"></script>
+<script src="js/ui.js?v=2"></script>
+<script src="js/main.js?v=2"></script>
 </body>
 </html>
