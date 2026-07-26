@@ -1,0 +1,326 @@
+{
+ "yeminhye_run": [
+  {
+   "file": "yeminhye_run_0.png",
+   "w": 243,
+   "h": 478,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_run_1.png",
+   "w": 200,
+   "h": 457,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_run_2.png",
+   "w": 224,
+   "h": 478,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_run_3.png",
+   "w": 209,
+   "h": 480,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_run_4.png",
+   "w": 202,
+   "h": 458,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_run_5.png",
+   "w": 233,
+   "h": 489,
+   "flag": ""
+  }
+ ],
+ "yeminhye_jump": [
+  {
+   "file": "yeminhye_jump_0.png",
+   "w": 233,
+   "h": 397,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_jump_1.png",
+   "w": 231,
+   "h": 439,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_jump_2.png",
+   "w": 213,
+   "h": 450,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_jump_3.png",
+   "w": 302,
+   "h": 470,
+   "flag": ""
+  }
+ ],
+ "yeminhye_misc": [
+  {
+   "file": "yeminhye_misc_0.png",
+   "w": 176,
+   "h": 484,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_misc_1.png",
+   "w": 199,
+   "h": 457,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_misc_2.png",
+   "w": 219,
+   "h": 454,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_misc_3.png",
+   "w": 210,
+   "h": 480,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_misc_4.png",
+   "w": 202,
+   "h": 458,
+   "flag": ""
+  },
+  {
+   "file": "yeminhye_misc_5.png",
+   "w": 233,
+   "h": 495,
+   "flag": ""
+  }
+ ],
+ "shinjunghan_run": [
+  {
+   "file": "shinjunghan_run_0.png",
+   "w": 219,
+   "h": 432,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_run_1.png",
+   "w": 260,
+   "h": 441,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_run_2.png",
+   "w": 163,
+   "h": 433,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_run_3.png",
+   "w": 207,
+   "h": 433,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_run_4.png",
+   "w": 256,
+   "h": 442,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_run_5.png",
+   "w": 192,
+   "h": 432,
+   "flag": ""
+  }
+ ],
+ "shinjunghan_jump": [
+  {
+   "file": "shinjunghan_jump_0.png",
+   "w": 201,
+   "h": 333,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_jump_1.png",
+   "w": 231,
+   "h": 441,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_jump_2.png",
+   "w": 194,
+   "h": 449,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_jump_3.png",
+   "w": 188,
+   "h": 496,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_jump_4.png",
+   "w": 249,
+   "h": 446,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_jump_5.png",
+   "w": 208,
+   "h": 433,
+   "flag": ""
+  }
+ ],
+ "shinjunghan_misc": [
+  {
+   "file": "shinjunghan_misc_0.png",
+   "w": 146,
+   "h": 435,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_misc_1.png",
+   "w": 231,
+   "h": 441,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_misc_2.png",
+   "w": 224,
+   "h": 434,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_misc_3.png",
+   "w": 169,
+   "h": 433,
+   "flag": ""
+  },
+  {
+   "file": "shinjunghan_misc_4.png",
+   "w": 287,
+   "h": 488,
+   "flag": ""
+  }
+ ],
+ "yonggamhui_run": [
+  {
+   "file": "yonggamhui_run_0.png",
+   "w": 250,
+   "h": 414,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_run_1.png",
+   "w": 180,
+   "h": 415,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_run_2.png",
+   "w": 193,
+   "h": 438,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_run_3.png",
+   "w": 238,
+   "h": 415,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_run_4.png",
+   "w": 184,
+   "h": 415,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_run_5.png",
+   "w": 216,
+   "h": 433,
+   "flag": ""
+  }
+ ],
+ "yonggamhui_jump": [
+  {
+   "file": "yonggamhui_jump_0.png",
+   "w": 184,
+   "h": 337,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_jump_1.png",
+   "w": 180,
+   "h": 415,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_jump_2.png",
+   "w": 188,
+   "h": 351,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_jump_3.png",
+   "w": 215,
+   "h": 466,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_jump_4.png",
+   "w": 184,
+   "h": 460,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_jump_5.png",
+   "w": 224,
+   "h": 419,
+   "flag": ""
+  }
+ ],
+ "yonggamhui_misc": [
+  {
+   "file": "yonggamhui_misc_0.png",
+   "w": 176,
+   "h": 420,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_misc_1.png",
+   "w": 178,
+   "h": 420,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_misc_2.png",
+   "w": 205,
+   "h": 423,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_misc_3.png",
+   "w": 210,
+   "h": 408,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_misc_4.png",
+   "w": 184,
+   "h": 415,
+   "flag": ""
+  },
+  {
+   "file": "yonggamhui_misc_5.png",
+   "w": 228,
+   "h": 428,
+   "flag": ""
+  }
+ ]
+}

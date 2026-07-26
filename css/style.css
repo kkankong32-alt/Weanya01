@@ -1,0 +1,999 @@
+/* ===== 슈퍼 마이크로 — shell / UI ===== */
+:root{
+  --ink:#eaf6ff; --dim:#9fb6cc;
+  --cyan:#39e0ff; --cyan-d:#0a7fa8;
+  --lime:#8ee63f; --amber:#ffc23d; --violet:#a86bff; --rose:#ff5d7a;
+  --panel:rgba(10,20,38,.93); --edge:rgba(90,200,255,.38);
+  --shadow:0 12px 34px rgba(0,0,0,.55);
+  --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#05080f; color:var(--ink); overflow:hidden;
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+  -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none;
+  touch-action:none;
+}
+#app{position:fixed;inset:0;display:grid;place-items:center;
+  background:radial-gradient(circle at 50% 40%,#132a45 0%,#070c16 70%)}
+
+/* stage keeps 16:9 and never crops */
+#stage{
+  position:relative; width:100%; height:100%;
+  max-width:calc(100vh * 16 / 9); max-height:calc(100vw * 9 / 16);
+  aspect-ratio:16/9; overflow:hidden; background:#050a14;
+  box-shadow:var(--shadow);
+  /* scales all UI with the stage: 1cqw-ish via custom prop set in JS */
+  font-size:var(--ui, 16px);
+}
+/* rendered at 3x internally with smooth vector art -> let the browser filter it */
+#game{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* ===== screens ===== */
+.screen{position:absolute;inset:0;display:none;z-index:5}
+.screen.active{display:grid;place-items:center}
+.screen.overlay{background:rgba(4,8,16,.82);backdrop-filter:blur(6px);z-index:30}
+.hidden{display:none !important}
+
+/* ===== loading ===== */
+#scr-loading{background:#060b15}
+.load-art{position:absolute;inset:0;background:#060b15 center/cover no-repeat;opacity:.5;filter:blur(2px)}
+.load-box{position:relative;text-align:center;width:min(70%,26em)}
+.logo-sm{font-size:2em;font-weight:900;letter-spacing:.06em;
+  background:linear-gradient(180deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 24px rgba(57,224,255,.4)}
+.bar{height:.7em;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden;margin:1.1em 0 .7em;
+  border:1px solid var(--edge)}
+.bar i{display:block;height:100%;width:0;border-radius:999px;
+  background:linear-gradient(90deg,var(--cyan),var(--lime));transition:width .2s ease}
+#load-text{font-size:.8em;color:var(--dim)}
+
+/* ===== title: image01.png IS the screen ===== */
+#scr-title{
+  /* soft base so a slow image never flashes a flat colour block */
+  background:linear-gradient(180deg,#3aa8e8 0%,#7fd8f2 45%,#bdeefb 72%,#2b7f9c 100%);
+  overflow:hidden;
+}
+/* enlarged, blurred copy fills any leftover letterbox instead of cropping the art */
+.title-blur{
+  position:absolute;inset:-6%;
+  background:url('../image/image01.png') center/cover no-repeat;
+  filter:blur(26px) saturate(1.15) brightness(.72);
+  transform:scale(1.1);
+  opacity:0;transition:opacity .6s ease;
+  pointer-events:none;
+}
+.title-blur.on{opacity:1}
+
+/* Two rows: artwork, then the creator credit. The frame shrinks to make room
+   rather than the credit overlapping the art or shoving buttons off-screen. */
+/* The artwork fills the stage — no letterbox band, no shrinking. Everything
+   (start button, creator credit) is overlaid INSIDE the frame in % coords. */
+#scr-title.active{display:grid;place-items:center}
+
+/* Frame locked to the artwork's exact ratio (1672x941). Because it fits with the
+   same ratio, the image fills it edge-to-edge — so % coords inside the frame map
+   1:1 onto the artwork at any screen size. */
+.title-frame{
+  position:relative;
+  aspect-ratio:1672 / 941;
+  width:auto;height:100%;
+  max-width:100%;max-height:100%;
+  margin:auto;
+}
+#title-img{
+  width:100%;height:100%;display:block;object-fit:contain;
+  opacity:0;transition:opacity .45s ease;
+}
+#title-img.on{opacity:1}
+
+/* real click target, pinned onto the button painted inside the artwork */
+.hit-start{
+  position:absolute;
+  left:37.6%;top:84.6%;width:25.4%;height:12.4%;
+  padding:0;border:0;border-radius:999px;cursor:pointer;
+  background:transparent;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .12s,transform .08s;
+}
+.hit-start:hover{background:rgba(255,255,255,.12)}
+.hit-start:active{background:rgba(255,255,255,.2);transform:scale(.985)}
+.hit-start:focus-visible{
+  outline:3px solid #fff;outline-offset:4px;
+  box-shadow:0 0 0 7px rgba(57,224,255,.55);
+}
+.hit-start[disabled]{cursor:default;pointer-events:none}
+
+/* ===== creator credit — overlaid INSIDE the key art (title screen only) =====
+   Sits in the empty water strip below the artwork's painted start button (which
+   ends at ~96% height), horizontally centred. Positioned in % of the frame so it
+   tracks the artwork at every size, exactly like the start button does. */
+/* Placement note: the artwork's painted start button (plus its glow) runs from
+   ~80% to ~98.5% of the image height, dead centre — there is no strip beneath it
+   for a two-line panel. An edge-energy scan of the lower band picked the areas
+   flanking the button as the emptiest; the left one holds the "미세 연못" signpost,
+   so the credit goes bottom-right, over the quiet ground/water. Still inside the
+   artwork, still large and immediately visible, and it never touches the button. */
+.creator-credit{
+  position:absolute;
+  left:auto;right:2.2%;bottom:2.4%;
+  transform:none;
+  z-index:4;
+  display:inline-flex;flex-direction:column;align-items:flex-end;gap:3px;
+  /* The artwork's painted start button ends at 63% width; right edge sits at
+     ~97.8%. Anything wider than ~34% would reach back under the button on a
+     small screen, where the clamp floors keep the text big but the frame shrinks. */
+  max-width:34%;
+  padding:9px 16px;
+  border:1px solid rgba(255,255,255,.34);
+  border-radius:11px;
+  /* dark + blurred so it stays legible over the bright key art */
+  background:rgba(5,10,20,.70);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  text-align:right;color:#f7fbff;
+  box-shadow:0 6px 20px rgba(0,0,0,.42);
+  pointer-events:none;                 /* never blocks the start button */
+}
+/* clamp floors: the stage em shrinks to ~14px on a phone, which would drop this
+   to ~8px. The credit must stay legible, so it never goes below 11px / 9.5px. */
+.creator-name{
+  font-size:clamp(14px, .72em, 22px);line-height:1.3;font-weight:750;word-break:keep-all;
+}
+.creator-name strong{color:#ffffff;font-weight:900}
+.creator-purpose{
+  font-size:clamp(11px, .54em, 16px);line-height:1.35;font-weight:550;
+  color:rgba(235,244,255,.90);word-break:keep-all;
+}
+/* short stages: shrink padding first, text last */
+@media (max-height:600px){
+  .creator-credit{right:1.6%;bottom:1.6%;max-width:34%;padding:6px 12px;gap:2px}
+  .creator-name{font-size:clamp(12px, .66em, 17px)}
+  .creator-purpose{font-size:clamp(10px, .49em, 13px)}
+}
+
+/* small tools cluster, kept clear of the artwork's title and button */
+.title-tools{
+  position:absolute;top:.5em;right:.55em;z-index:3;
+  display:flex;gap:.3em;flex-wrap:wrap;justify-content:flex-end;max-width:70%;
+}
+.tool{
+  font:inherit;font-size:.58em;font-weight:800;color:var(--ink);cursor:pointer;
+  padding:.45em .7em;border-radius:999px;
+  border:1px solid rgba(140,225,255,.5);
+  background:rgba(6,16,34,.62);backdrop-filter:blur(4px);
+  text-shadow:0 1px 2px #000;transition:border-color .12s,background .12s,transform .08s;
+}
+.tool:hover,.tool:focus-visible{outline:none;border-color:var(--cyan);background:rgba(10,32,60,.85);transform:translateY(-1px)}
+.tool:focus-visible{box-shadow:0 0 0 3px rgba(57,224,255,.5)}
+.tool[disabled]{opacity:.35;pointer-events:none}
+
+/* error panel */
+.err-detail{font-size:.62em;color:var(--dim);word-break:break-all;max-width:22em}
+
+/* ===== menus / panels ===== */
+.menu{display:grid;gap:.4em;width:min(72%,17em)}
+.menu.row{grid-auto-flow:column;width:auto;justify-content:center}
+.btn{
+  font:inherit;font-size:.85em;font-weight:800;color:var(--ink);cursor:pointer;
+  padding:.6em 1em;border-radius:999px;border:1px solid var(--edge);
+  background:linear-gradient(180deg,rgba(20,44,78,.95),rgba(8,18,36,.95));
+  box-shadow:0 3px 0 rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.12);
+  transition:transform .08s,box-shadow .12s,border-color .12s;
+}
+.btn:hover,.btn:focus-visible,.btn.sel{
+  outline:none;border-color:var(--cyan);transform:translateY(-1px);
+  box-shadow:0 5px 0 rgba(0,0,0,.45),0 0 20px rgba(57,224,255,.45),inset 0 1px 0 rgba(255,255,255,.18)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
+.btn.primary{background:linear-gradient(180deg,#1ec8ff,#0a6ea8);border-color:#8ceaff;color:#04131f}
+.btn.small{font-size:.72em;padding:.45em .8em}
+.btn[disabled]{opacity:.4;pointer-events:none;filter:grayscale(1)}
+.icon-btn{font:inherit;font-size:.8em;cursor:pointer;color:var(--ink);width:2em;height:2em;
+  border-radius:.5em;border:1px solid var(--edge);background:rgba(8,18,36,.85);display:grid;place-items:center}
+.icon-btn.ghost{border-color:transparent;background:transparent}
+.panel{
+  background:var(--panel);border:1px solid var(--edge);border-radius:var(--r);
+  padding:1.2em 1.4em;box-shadow:var(--shadow);text-align:center;
+  display:grid;gap:.7em;justify-items:center;width:min(80%,24em)}
+.panel.wide{width:min(92%,34em)}
+.panel h2{font-size:1.15em;font-weight:900}
+.panel h3{font-size:.85em;font-weight:800;color:var(--cyan)}
+.toggles{display:flex;gap:.4em}
+
+/* ===== controls sheet ===== */
+.ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:.45em;width:100%;font-size:.74em}
+.ctrl-grid div{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+  border-radius:.55em;padding:.5em .6em;text-align:left;display:grid;gap:.15em}
+.ctrl-grid b{color:var(--cyan);font-weight:900}
+.ctrl-grid span{color:var(--dim);font-size:.9em}
+.tip{font-size:.7em;color:var(--dim)}
+.slider{display:grid;gap:.3em;width:100%;font-size:.78em;text-align:left}
+.slider input{width:100%;accent-color:var(--cyan)}
+
+/* ===== world select ===== */
+.world-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.5em;width:100%}
+.wcard{position:relative;cursor:pointer;border-radius:.6em;overflow:hidden;border:1px solid var(--edge);
+  background:#0a1526;aspect-ratio:4/3;display:grid;place-items:end center;padding:.4em;
+  background-size:cover;background-position:center}
+.wcard:hover,.wcard.sel{border-color:var(--cyan);box-shadow:0 0 18px rgba(57,224,255,.5)}
+.wcard span{position:relative;font-size:.62em;font-weight:800;text-shadow:0 1px 4px #000}
+.wcard::before{content:"";position:absolute;inset:0;background:linear-gradient(transparent 40%,rgba(4,10,20,.92))}
+.wcard.locked{filter:grayscale(.9) brightness(.5);cursor:not-allowed}
+.wcard.locked::after{content:"🔒";position:absolute;top:.3em;right:.4em;font-size:.7em;filter:none}
+.wcard.done::after{content:"★";position:absolute;top:.2em;right:.4em;font-size:.8em;color:var(--amber)}
+
+/* ===== stage intro ===== */
+#scr-intro{background:#050a14}
+.intro-art{position:absolute;inset:0;background:#050a14 center/cover no-repeat}
+.intro-art::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,9,18,.94) 30%,rgba(4,9,18,.25))}
+.intro-box{position:relative;width:min(90%,32em);text-align:left;padding:0 1.2em}
+.intro-eyebrow{font-size:.7em;font-weight:800;color:var(--cyan);letter-spacing:.2em}
+.intro-box h2{font-size:1.8em;font-weight:900;text-shadow:0 3px 10px #000;margin:.05em 0 .3em}
+.intro-box p{font-size:.78em;color:#cfe3f5;line-height:1.55;max-width:22em;text-shadow:0 1px 4px #000}
+.intro-go{margin-top:.9em;font-size:.66em !important;color:var(--dim) !important;animation:blink 1.1s infinite}
+@keyframes blink{50%{opacity:.35}}
+
+/* ===== stage card (over the live game) ===== */
+#intro-card{
+  position:absolute;left:50%;bottom:8%;transform:translate(-50%,12px);
+  z-index:18;pointer-events:none;text-align:left;
+  width:min(84%,26em);padding:.7em 1em;border-radius:.8em;
+  background:rgba(6,14,28,.9);border:1px solid var(--edge);box-shadow:var(--shadow);
+  opacity:0;transition:opacity .3s ease,transform .3s ease;
+}
+#intro-card.show{opacity:1;transform:translate(-50%,0)}
+#intro-card h2{font-size:1.05em;font-weight:900;margin:.05em 0 .25em}
+#intro-card p{font-size:.68em;line-height:1.5;color:#cfe3f5}
+#intro-card .intro-eyebrow{font-size:.6em;letter-spacing:.18em;color:var(--cyan);font-weight:800}
+.card-skip{margin-top:.4em;font-size:.58em !important;color:var(--dim) !important;animation:blink 1.2s infinite}
+
+/* ===== HUD ===== */
+#hud{position:absolute;top:0;left:0;right:0;z-index:12;pointer-events:none;
+  display:flex;justify-content:space-between;align-items:flex-start;padding:.5em .6em;
+  padding-top:max(.5em,env(safe-area-inset-top));
+  /* landscape notch: without these the pause button can sit under the bezel */
+  padding-left:max(.6em,env(safe-area-inset-left));
+  padding-right:max(.6em,env(safe-area-inset-right))}
+.hud-left,.hud-right{display:flex;gap:.35em;align-items:center}
+.hud-right{pointer-events:auto}
+.hud-chip{font-size:.62em;font-weight:800;padding:.3em .6em;border-radius:999px;
+  background:rgba(6,14,28,.72);border:1px solid rgba(90,200,255,.3);display:flex;gap:.35em;align-items:center;
+  text-shadow:0 1px 2px #000}
+.hud-chip b{font-variant-numeric:tabular-nums;transition:transform .12s}
+.hud-chip b.pop{transform:scale(1.45);color:var(--amber)}
+.orb-dot{width:.7em;height:.7em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,var(--lime) 55%,#2c7a12);
+  box-shadow:0 0 6px var(--lime)}
+.hearts{display:flex;gap:.15em}
+.heart{width:.85em;height:.85em;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#bff6ff,var(--cyan) 55%,#0a5b7d);
+  box-shadow:0 0 7px rgba(57,224,255,.85);transition:transform .15s,opacity .15s}
+.heart.off{background:rgba(255,255,255,.12);box-shadow:none;opacity:.5;transform:scale(.75)}
+
+/* ===== objective panel =====
+   Drawn entirely in CSS. The artwork banner was a fixed-ratio image being stretched
+   to fit variable-length Korean text, so its decorations collided with the words —
+   a panel that grows with its content can't have that problem. */
+#goal-banner{
+  position:absolute;left:50%;top:2.5em;transform:translate(-50%,0);z-index:16;
+  width:min(90%,32em);pointer-events:none;
+  display:flex;align-items:center;gap:.55em;
+  padding:.5em .6em;
+  background:rgba(7,20,42,.88);
+  border:1px solid rgba(101,242,211,.55);
+  border-radius:.7em;
+  box-shadow:0 4px 14px rgba(0,0,0,.4);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  transition:opacity .25s,transform .25s;
+}
+#goal-banner.hidden{display:none}
+#goal-banner.done{transform:translate(-50%,-.15em) scale(.94);opacity:.85;
+  border-color:rgba(182,255,103,.85)}
+
+/* The badge is a real button so the minimised panel can be reopened by tapping it.
+   It is the ONE part of #goal-banner that takes pointer events. */
+.gb-badge{
+  flex:0 0 auto;align-self:flex-start;
+  font:inherit;
+  font-size:.5em;font-weight:900;letter-spacing:.02em;white-space:nowrap;
+  color:#0a1b2e;background:#65f2d3;border:0;border-radius:.4em;padding:.3em .5em;
+  word-break:keep-all;pointer-events:auto;cursor:pointer;
+}
+.gb-badge:focus-visible{outline:2px solid #fff;outline-offset:1px}
+#goal-banner.done .gb-badge{background:#b6ff67}
+
+.gb-in{flex:1;min-width:0;text-align:left;display:grid;gap:.1em}
+/* keep-all stops Korean breaking one character per line in a narrow box */
+.gb-title,.gb-how,.gb-next,.gb-obs{word-break:keep-all;overflow-wrap:break-word;line-height:1.35}
+.gb-title{font-size:.62em;font-weight:800;color:#ffffff}
+.gb-how{font-size:.53em;color:rgba(228,240,255,.82)}
+.gb-next{font-size:.5em;color:rgba(228,240,255,.55)}
+/* observation gate: amber while the exit is locked, lime the moment it opens.
+   State is carried by the wording too, not colour alone. */
+.gb-obs{font-size:.5em;font-weight:800;color:var(--amber);margin-top:.15em}
+.gb-obs.done{color:var(--lime)}
+.gb-obs.hidden{display:none}
+
+.gb-prog{flex:0 0 auto;font-size:.72em;font-weight:900;color:#65f2d3;
+  background:rgba(101,242,211,.12);border:1px solid rgba(101,242,211,.5);
+  border-radius:999px;padding:.15em .5em;white-space:nowrap}
+.gb-prog span{font-variant-numeric:tabular-nums}
+.gb-prog.pop{animation:gbPop .3s ease}
+@keyframes gbPop{40%{transform:scale(1.28)}}
+#goal-banner.done .gb-prog{color:#b6ff67;border-color:rgba(182,255,103,.7);
+  background:rgba(182,255,103,.16)}
+
+#goal-hint{
+  position:absolute;left:50%;top:8em;transform:translate(-50%,0);z-index:16;
+  font-size:.58em;font-weight:700;color:#04202c;pointer-events:none;
+  background:rgba(255,236,150,.95);border:1px solid #c79a24;border-radius:999px;
+  padding:.3em .8em;box-shadow:0 3px 8px rgba(0,0,0,.35);
+  animation:toastIn .25s ease;max-width:84%;text-align:center;word-break:keep-all}
+
+/* ---------- minimised objective panel ----------
+   ui.js adds .mini a few seconds after a goal appears. The panel keeps only its
+   badge and its counter, so a short landscape viewport gets its playfield back
+   without the objective being destroyed — tapping the badge brings the text back.
+   Driven by a class rather than a media query on purpose: the same collapse
+   behaviour is wanted on a laptop in a small window, and the player can override
+   it either way. */
+#goal-banner.mini{
+  left:auto;right:.5em;transform:none;
+  width:auto;max-width:none;
+  padding:.28em .35em;gap:.3em;
+  background:rgba(7,20,42,.72);
+}
+#goal-banner.mini .gb-in{display:none}
+#goal-banner.mini .gb-badge{align-self:center}
+#goal-banner.mini .gb-prog{font-size:.6em}
+/* the observation/confirmation line is the one thing that survives minimising:
+   it is what tells the player the exit is still locked */
+#goal-banner.mini .gb-in .gb-obs{display:none}
+
+/* narrow screens: let the panel grow taller instead of squeezing the text */
+@media (max-width:560px){
+  #goal-banner{width:95%;flex-wrap:wrap;gap:.35em}
+  .gb-next{display:none}
+  .gb-prog{order:3}
+  #goal-banner.mini{width:auto}
+}
+
+/* ---------- short landscape (iPhone SE sideways is 667x375) ----------
+   The permanent overlays were covering the platforms. The objective panel drops
+   its secondary lines, the hint chip moves up under it, and the HUD goes to
+   icon+number only. Nothing is removed that the player needs to finish a stage. */
+@media (max-height:400px){
+  #goal-banner{top:1.6em;padding:.32em .45em;gap:.4em;width:min(94%,30em)}
+  .gb-how{display:none}
+  .gb-next{display:none}
+  .gb-title{font-size:.56em}
+  .gb-obs{font-size:.46em}
+  #goal-hint{top:5.2em;font-size:.5em;padding:.25em .6em}
+
+  /* HUD compact: labels off, icons and numbers on */
+  #hud{padding:.28em .4em;padding-top:max(.28em,env(safe-area-inset-top))}
+  .hud-left,.hud-right{gap:.25em}
+  .hud-chip{font-size:.54em;padding:.22em .45em;gap:.25em}
+  .hud-chip .chip-lab{display:none}
+  .hud-chip.stage{max-width:7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip-ico{font-style:normal;line-height:1}
+  .heart{width:.7em;height:.7em}
+  .hearts{gap:.1em}
+}
+/* the score star is only meaningful once the word "점수" is hidden */
+.chip-ico{display:none;font-style:normal;color:var(--amber)}
+@media (max-height:400px){ .chip-ico{display:inline} }
+
+/* ===== toast / banner ===== */
+#toast{position:absolute;left:50%;top:16%;transform:translateX(-50%);z-index:20;
+  font-size:.72em;font-weight:800;padding:.5em 1em;border-radius:999px;
+  background:rgba(6,14,28,.92);border:1px solid var(--cyan);box-shadow:0 0 22px rgba(57,224,255,.5);
+  animation:toastIn .3s ease; pointer-events:none; text-align:center; max-width:80%}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,-10px)}}
+#banner{position:absolute;left:0;right:0;bottom:0;z-index:20;pointer-events:none;
+  padding:0 .6em .6em; padding-bottom:max(.6em,env(safe-area-inset-bottom))}
+.banner-in{margin:0 auto;max-width:34em;background:rgba(6,14,28,.93);border:1px solid var(--edge);
+  border-radius:.7em;padding:.55em .9em;box-shadow:var(--shadow);animation:toastIn .25s ease}
+#banner p{font-size:.7em;line-height:1.5;text-align:center}
+#banner b{color:var(--amber)}
+
+/* ===== interact prompt ===== */
+#prompt{position:absolute;z-index:14;pointer-events:none;transform:translate(-50%,-100%);
+  font-size:.7em;font-weight:900;padding:.25em .55em;border-radius:.4em;
+  background:rgba(6,14,28,.9);border:1px solid var(--cyan);animation:bob .8s infinite ease-in-out}
+@keyframes bob{50%{transform:translate(-50%,calc(-100% - .3em))}}
+
+/* Status read-out. Intentionally NOT styled like #prompt: no key cap, no cyan
+   action border, no bobbing. It states a fact; it does not invite a press. */
+#status-label{position:absolute;z-index:13;pointer-events:none;
+  transform:translate(-50%,-100%);
+  font-size:.5em;font-weight:800;padding:.3em .6em;border-radius:999px;
+  white-space:nowrap;word-break:keep-all;
+  color:#dff3ff;background:rgba(6,14,28,.82);
+  border:1px solid rgba(160,200,225,.45);
+  box-shadow:0 2px 8px rgba(0,0,0,.4)}
+#status-label::before{content:"●";color:#ffa63d;font-size:.8em;margin-right:.35em;
+  vertical-align:.05em}
+#status-label.on{color:#eaffd6;border-color:rgba(142,230,63,.55)}
+#status-label.on::before{content:"●";color:var(--lime)}
+
+/* ===== back-to-pipe arrow =====
+   Appears only while the observation gate is turning the player around. */
+#back-arrow{
+  position:absolute;left:max(.6em,env(safe-area-inset-left));top:50%;transform:translateY(-50%);
+  z-index:16;pointer-events:none;
+  display:flex;align-items:center;gap:.3em;
+  padding:.35em .7em;border-radius:999px;
+  background:rgba(6,14,28,.86);border:1px solid var(--amber);
+  box-shadow:0 0 16px rgba(255,194,61,.45);
+  animation:baNudge 1.1s ease-in-out infinite;
+}
+#back-arrow .ba-chev{font-size:.8em;font-weight:900;color:var(--amber);line-height:1}
+#back-arrow .ba-text{font-size:.52em;font-weight:900;color:#ffe9b8;word-break:keep-all}
+@keyframes baNudge{50%{transform:translateY(-50%) translateX(-.35em)}}
+
+/* ===== touch =====
+   Safe areas matter on all four sides here, not just the bottom. In LANDSCAPE the
+   notch and the rounded corners eat the left/right edges — which is exactly where
+   both thumb pads live — and the home indicator runs along the bottom. Without the
+   left/right insets the ◀ and ▲ buttons sit under the bezel on a notched phone and
+   simply cannot be pressed. */
+#touch{position:absolute;inset:0;z-index:15;pointer-events:none}
+.pad-left,.pad-right{position:absolute;bottom:0;display:flex;gap:.5em;align-items:flex-end;
+  padding:1em; padding-bottom:max(1em,env(safe-area-inset-bottom))}
+.pad-left{left:0;padding-left:max(1em,env(safe-area-inset-left))}
+.pad-right{right:0;padding-right:max(1em,env(safe-area-inset-right))}
+.tbtn{pointer-events:auto;font:inherit;font-size:1.1em;font-weight:900;color:rgba(255,255,255,.92);
+  width:3.1em;height:3.1em;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  border:2px solid rgba(140,225,255,.5);background:rgba(10,24,44,.5);backdrop-filter:blur(3px);
+  touch-action:none}
+.tbtn.jump{width:4em;height:4em;border-color:rgba(140,255,180,.6);background:rgba(20,60,40,.5)}
+.tbtn.act{width:2.6em;height:2.6em;font-size:.9em;opacity:0;transition:opacity .18s;pointer-events:none}
+.tbtn.act.on{opacity:1;pointer-events:auto}
+.tbtn.down{background:rgba(57,224,255,.55);transform:scale(.94)}
+
+/* ===== mission ===== */
+/* A tall mission (the microscope) overflowed the stage and cut off the hint line
+   — the one place the game tells the player what to fix. Cap it to the stage and
+   let the body scroll instead of the panel growing past the screen. */
+.mission-shell{width:min(94%,30em);background:var(--panel);border:1px solid var(--edge);
+  border-radius:var(--r);padding:.9em 1em;box-shadow:var(--shadow);display:grid;gap:.5em;
+  max-height:94%;overflow-y:auto;overscroll-behavior:contain}
+.mission-head{display:flex;align-items:center;gap:.5em}
+.mission-head h3{flex:1;font-size:.95em;font-weight:900;text-align:left;color:var(--ink)}
+.mtag{font-size:.58em;font-weight:800;padding:.25em .55em;border-radius:999px;
+  background:rgba(57,224,255,.16);border:1px solid var(--cyan);color:var(--cyan)}
+.mission-goal{font-size:.72em;color:#cfe3f5;text-align:left;line-height:1.5}
+.mission-body{display:grid;gap:.5em;justify-items:center}
+.mission-hint{font-size:.66em;color:var(--dim);min-height:1.4em;text-align:center}
+.mission-hint.bad{color:var(--rose)}
+.mission-hint.good{color:var(--lime)}
+
+/* ===== microscope mission ===== */
+.scope-wrap{display:grid;gap:.45em;justify-items:center;width:100%}
+.scope-cap{font-size:.62em;color:#cfe3f5;text-align:center;line-height:1.4}
+.scope-cap b{color:var(--cyan)}
+
+/* square container => the observation window is a TRUE circle, never an ellipse */
+.scope-round{position:relative;width:min(64vw,13em);aspect-ratio:1/1}
+.scope-clip{
+  position:absolute;left:20%;top:20%;width:60%;height:60%;
+  border-radius:50%;overflow:hidden;background:#0a1622;
+}
+.scope-clip img{
+  width:100%;height:100%;object-fit:cover;display:block;
+  transition:filter .18s linear, transform .22s ease;
+  transform-origin:center center;
+}
+.scope-clip::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:50%;
+  box-shadow:inset 0 0 22px rgba(0,0,0,.65)}
+.scope-bezel{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
+  filter:drop-shadow(0 3px 8px rgba(0,0,0,.5))}
+
+/* magnification */
+.mag-row{display:flex;gap:.35em}
+.magb{font:inherit;font-size:.6em;font-weight:800;cursor:pointer;color:var(--ink);
+  padding:.35em .7em;border-radius:999px;border:1px solid var(--edge);
+  background:rgba(255,255,255,.05);transition:all .12s}
+.magb:hover,.magb:focus-visible{border-color:var(--cyan);outline:none}
+.magb.sel{background:rgba(57,224,255,.2);border-color:var(--cyan);color:#eaffff}
+
+/* rotary knobs */
+.knob-row{display:flex;gap:.8em;justify-content:center;align-items:flex-start}
+.knob{position:relative;display:grid;justify-items:center;gap:.15em;width:4.4em;
+  transition:opacity .2s}
+.knob.dim{opacity:.35}
+.knob img{width:3.4em;height:auto;display:block;pointer-events:none;
+  transition:transform .06s linear;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}
+.knob-hit{position:absolute;left:50%;top:0;transform:translateX(-50%);
+  width:3.6em;height:3.6em;border-radius:50%;cursor:grab;touch-action:none}
+.knob-hit:active{cursor:grabbing}
+.knob-hit:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.knob-cap{font-size:.55em;font-weight:800;color:var(--dim);margin-top:3.5em}
+
+/* structure choice */
+.id-row{display:grid;gap:.3em;width:min(100%,18em);justify-items:stretch}
+.id-row.hidden{display:none}
+.id-found{font-size:.62em;font-weight:700;color:var(--lime);text-align:center;
+  word-break:keep-all;line-height:1.45;margin-bottom:.2em}
+
+/* ===== final focus review — the reward for getting the knobs right ===== */
+.review-row{display:grid;gap:.25em;justify-items:center;width:min(100%,20em);text-align:center}
+.review-row.hidden{display:none}
+.rv-ok{font-size:.68em;font-weight:900;color:var(--lime);letter-spacing:.02em;
+  text-shadow:0 0 12px rgba(142,230,63,.45)}
+.rv-note{font-size:.56em;font-weight:600;color:#ffffff;word-break:keep-all;line-height:1.45}
+.rv-go{margin-top:.3em;font-size:.72em;padding:.6em 1.4em}
+/* knobs are frozen at review: the reading must not change while it is being read */
+.knob-row.locked,.mag-row.locked{opacity:.4;pointer-events:none;filter:saturate(.5)}
+.id-q{font-size:.64em;font-weight:800;color:var(--cyan);text-align:center}
+.idb{font:inherit;font-size:.64em;font-weight:700;cursor:pointer;color:var(--ink);
+  padding:.5em .7em;border-radius:.5em;border:1px solid var(--edge);
+  background:rgba(255,255,255,.05);transition:all .12s}
+.idb:hover,.idb:focus-visible{border-color:var(--cyan);background:rgba(57,224,255,.14);outline:none}
+
+/* ===== dial mission (humidity / environment) =====
+   These are <button>s: without an explicit colour they inherit the UA's black
+   button text, which was invisible on the dark panel. */
+.dial-row{display:flex;gap:.5em;width:100%;justify-content:center;flex-wrap:wrap}
+.dial{
+  cursor:pointer;flex:1 1 0;min-width:6.5em;max-width:9em;
+  padding:.8em .5em;border-radius:.7em;text-align:center;
+  border:2px solid rgba(101,242,211,.35);
+  background:linear-gradient(180deg,rgba(22,44,72,.95),rgba(10,22,40,.95));
+  font-size:.68em;font-weight:800;
+  color:#ffffff;                       /* was black */
+  display:grid;gap:.35em;justify-items:center;align-content:start;
+  word-break:keep-all;line-height:1.35;
+  transition:border-color .12s,background .12s,transform .08s,box-shadow .12s;
+}
+.dial:hover,.dial:focus-visible,.dial.sel{
+  outline:none;border-color:var(--cyan);
+  background:linear-gradient(180deg,rgba(30,72,110,.98),rgba(14,34,58,.98));
+  transform:translateY(-2px);
+  box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 0 3px rgba(57,224,255,.28);
+}
+.dial.ok{border-color:var(--lime);background:linear-gradient(180deg,rgba(60,110,30,.95),rgba(28,56,14,.95))}
+.dial.bad{border-color:var(--rose);animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+/* the icon is the card's headline, not a decoration */
+.dial em{font-size:2.6em;font-style:normal;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+/* drawn icons sit in the same box an emoji would, so rows stay aligned */
+.dial em .ico-svg{width:1em;height:1em;display:block}
+.dial b{font-size:1.05em;font-weight:900;color:#ffffff;word-break:keep-all}
+.dial small{color:#bcd6e6;font-size:.86em;font-weight:600;word-break:keep-all;line-height:1.4}
+
+/* classify mission */
+/* ===== sorting bins ===== */
+.bins{display:flex;gap:.5em;width:100%;justify-content:center;flex-wrap:wrap}
+.bin{
+  flex:1 1 0;min-width:6.4em;max-width:9.5em;min-height:5em;
+  border-radius:.6em;border:2px dashed rgba(101,242,211,.4);
+  display:grid;place-items:center;gap:.3em;padding:.6em .5em;
+  font-size:.62em;font-weight:800;cursor:pointer;
+  background:linear-gradient(180deg,rgba(22,44,72,.95),rgba(10,22,40,.95));
+  color:#ffffff;                       /* was black */
+  text-align:center;
+  /* keep-all: stops '생활에 이용돼요' breaking as '생활에 이용돼 / 요' */
+  word-break:keep-all;overflow-wrap:break-word;line-height:1.4;
+  transition:border-color .12s,background .12s,transform .08s,box-shadow .12s;
+}
+.bin span{color:#ffffff;word-break:keep-all;display:block}
+.bin:hover,.bin:focus-visible,.bin.sel{
+  outline:none;border-color:var(--cyan);border-style:solid;
+  background:linear-gradient(180deg,rgba(30,72,110,.98),rgba(14,34,58,.98));
+  transform:translateY(-2px);
+  box-shadow:0 6px 16px rgba(0,0,0,.45),0 0 0 3px rgba(57,224,255,.28);
+}
+.bin.filled{border-style:solid;border-color:var(--lime);
+  background:linear-gradient(180deg,rgba(60,110,30,.95),rgba(28,56,14,.95))}
+.bin[disabled]{opacity:.5;pointer-events:none}
+.bin svg{width:3.2em;height:2.1em}
+.specimen{display:grid;justify-items:center;gap:.3em}
+.specimen svg{width:5em;height:3.4em}
+.specimen p{font-size:.64em;color:var(--dim)}
+
+/* ===== 세균 사진 자료 판독실 =====
+   Real photographs replaced the code-drawn shape icons, so everything here is
+   built around showing ONE plate big enough to actually read. */
+.bact-wrap{display:grid;gap:.5em;justify-items:center;width:100%}
+.bact-step{font-size:.56em;font-weight:900;letter-spacing:.06em;color:var(--cyan)}
+.bact-count{font-size:.6em;font-weight:900;color:var(--cyan)}
+
+/* reference plate + the band spotlight */
+.bact-ref{position:relative;width:min(92%,22em);border-radius:.5em;overflow:hidden;
+  background:#f2f6f9;border:1px solid var(--edge)}
+.bact-ref-img{width:100%;height:auto;display:block}
+.bact-zone{position:absolute;border-radius:.4em;pointer-events:none;
+  border:2px solid var(--cyan);background:rgba(57,224,255,.16);
+  box-shadow:0 0 0 2px rgba(4,10,20,.5),0 0 18px rgba(57,224,255,.5);
+  transition:left .25s ease,top .25s ease,width .25s ease,height .25s ease}
+.bact-zone.hidden{display:none}
+.bact-feat{font-size:.58em;line-height:1.5;color:#ffffff;text-align:center;
+  word-break:keep-all;max-width:22em}
+.bact-feat b{color:var(--cyan)}
+
+/* the specimen under judgement — big, uncropped, on a light bench */
+.bact-card{width:min(88%,20em);border-radius:.55em;padding:.4em;
+  background:#eef4f8;border:2px solid var(--edge);
+  display:grid;place-items:center;transition:border-color .2s,box-shadow .2s}
+.bact-card.ok{border-color:var(--lime);box-shadow:0 0 0 3px rgba(142,230,63,.35),0 0 22px rgba(142,230,63,.4)}
+.bact-img{width:100%;max-height:13em;object-fit:contain;display:block;border-radius:.4em}
+.bact-q{font-size:.66em;font-weight:800;color:#ffffff;text-align:center;word-break:keep-all}
+
+/* bins: state is carried by border STYLE + colour + an explicit ✓/✕ label, so it
+   never depends on colour alone */
+.bact-bin{min-height:3.4em;font-size:.6em}
+.bact-bin span{font-size:1em;font-weight:900;word-break:keep-all;white-space:nowrap}
+.bact-chk{font-style:normal;font-size:.82em;font-weight:800;color:#cfe3f5;min-height:1em;display:block}
+.bact-bin.filled .bact-chk{color:#eaffd6}
+.bact-bin.wrong{border-style:solid;border-color:var(--rose);
+  background:linear-gradient(180deg,rgba(110,30,48,.95),rgba(58,14,26,.95));
+  animation:bactShake .3s}
+.bact-bin.wrong .bact-chk{color:#ffd9e1}
+@keyframes bactShake{25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+
+.bact-after{display:grid;gap:.4em;justify-items:center;width:100%}
+.bact-after.hidden{display:none}
+.bact-ok{font-size:.6em;font-weight:700;color:var(--lime);text-align:center;
+  word-break:keep-all;line-height:1.5;max-width:22em}
+.bact-go{font-size:.7em;padding:.55em 1.3em;margin-top:.2em}
+.bact-go:disabled{opacity:.4;cursor:default;pointer-events:none}
+.bact-note{font-size:.5em;color:var(--dim);text-align:center;word-break:keep-all;max-width:24em}
+
+/* summary: 3 across, folding to 2 then 1 as the stage narrows */
+.bact-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:.5em;width:min(96%,26em)}
+.bact-sum-cell{display:grid;gap:.2em;justify-items:center}
+.bact-sum-img{width:100%;aspect-ratio:4/3;object-fit:contain;border-radius:.4em;
+  background:#eef4f8;border:1px solid var(--edge);display:block}
+.bact-sum-cell figcaption{font-size:.52em;font-weight:900;color:#ffffff;word-break:keep-all}
+.bact-wrapup{font-size:.6em;line-height:1.55;color:#ffffff;text-align:center;
+  word-break:keep-all;max-width:24em}
+.bact-wrapup b{color:var(--cyan)}
+@media (max-width:560px){
+  .bact-sum{grid-template-columns:repeat(2,1fr)}
+  .bact-img{max-height:9em}
+  .bact-ref{width:96%}
+}
+/* Phone landscape: the stage em scales with WIDTH, so an em-based cap here still
+   let the photo eat the whole panel and pushed the answer bins below the fold.
+   Cap against viewport height instead — the bins must always be reachable
+   without scrolling. */
+@media (max-height:430px){
+  /* The panel's own gaps and padding scale with --ui (which tracks WIDTH), so on a
+     wide-but-short phone they alone ate ~110px and pushed the bins off. Tighten
+     the chrome first, the photo second, and never the text. */
+  .mission-shell{padding:.45em .7em;gap:.22em}
+  .mission-goal{font-size:.58em;line-height:1.35}
+  .mission-head h3{font-size:.8em}
+  .bact-img{max-height:26vh}
+  .bact-ref{width:min(52%,15em)}
+  .bact-ref-img{max-height:26vh;object-fit:contain}
+  .bact-card{padding:.2em}
+  .bact-wrap{gap:.25em}
+  .bact-q{font-size:.56em}
+  .bact-bin{min-height:2.6em}
+  .bact-sum-img{max-height:16vh}
+  /* the tint disclaimer shrinks but must never be dropped — it is the one thing
+     stopping a kid concluding bacteria are actually purple */
+  .bact-note{font-size:.44em}
+}
+
+/* a photo that will not load must say so in words, not show a broken icon */
+.img-fail{display:grid;place-items:center;width:100%;min-height:5em;padding:.6em;
+  border-radius:.4em;background:rgba(90,20,30,.28);border:1px dashed var(--rose);
+  color:#ffd9e1;font-size:.54em;font-weight:800;text-align:center;word-break:keep-all}
+
+/* bacteria: study the reference data, then sort by outline */
+.study-wrap,.sort-wrap{display:grid;gap:.5em;justify-items:center;width:100%}
+.study-wrap.hidden,.sort-wrap.hidden{display:none}
+.study-img{width:min(100%,17em);border-radius:.5em;border:1px solid var(--edge);display:block}
+.study-note{font-size:.55em;color:var(--dim);text-align:center;line-height:1.4}
+
+/* bacteria: habitat + growth conditions */
+.habitat-wrap{display:grid;gap:.5em;justify-items:center;width:100%}
+.habitat-img{width:min(100%,16em);border-radius:.5em;border:1px solid var(--edge);display:block}
+.cond-rows{display:grid;gap:.35em;width:100%}
+.cond-row{display:flex;gap:.4em;align-items:stretch;justify-content:center}
+.cond-lab{flex:0 0 3.2em;align-self:center;font-size:.6em;font-weight:800;color:#bcd6e6;
+  text-align:right;word-break:keep-all}
+.cond-btn{padding:.45em .4em;min-width:5em;max-width:7.5em}
+.cond-btn em{font-size:1.6em}
+.cond-btn b{font-size:.95em}
+/* live "how many bacteria" gauge — the comparison must be felt, not told */
+.grow-gauge{width:min(100%,16em);height:.8em;border-radius:999px;overflow:hidden;
+  background:rgba(255,255,255,.1);border:1px solid var(--edge)}
+.grow-gauge i{display:block;height:100%;width:0;transition:width .3s ease;
+  background:linear-gradient(90deg,#4fc4e0,#ffb03d,#ff5b45)}
+.grow-txt{font-size:.62em;font-weight:800;color:#bcd6e6;word-break:keep-all}
+.grow-txt.hot{color:#ff8a70}
+
+/* bacteria: role sorting */
+.role-card{display:grid;justify-items:center;gap:.3em;width:100%}
+.role-card img{width:min(100%,11em);border-radius:.5em;border:1px solid var(--edge);display:block}
+.role-card p{font-size:.68em;font-weight:800;color:#cfe3f5;text-align:center}
+.role-bin{min-height:3.6em}
+.role-bin em{font-size:1.5em;font-style:normal}
+
+/* valve mission */
+.valves{display:flex;gap:.5em;flex-wrap:wrap;justify-content:center}
+.valve{width:4.2em;cursor:pointer;display:grid;justify-items:center;gap:.15em;
+  padding:.35em;border-radius:.5em;border:1px solid var(--edge);background:rgba(255,255,255,.04);
+  font-size:.55em;font-weight:800}
+.valve img{width:2.6em;height:2.6em;object-fit:contain;transition:transform .3s}
+.valve.sel{border-color:var(--cyan);background:rgba(57,224,255,.12)}
+.valve.shut{border-color:var(--lime);background:rgba(142,230,63,.16)}
+.valve.shut img{transform:rotate(140deg)}
+
+/* meter */
+.meter{width:min(100%,16em);height:.75em;border-radius:999px;background:rgba(255,255,255,.1);
+  border:1px solid var(--edge);overflow:hidden}
+.meter i{display:block;height:100%;width:0;transition:width .25s;
+  background:linear-gradient(90deg,var(--rose),var(--amber),var(--lime))}
+
+/* ===== biotech (ending) mission — one large case at a time ===== */
+.biotech-card{
+  display:grid;justify-items:center;gap:.3em;text-align:center;
+  width:min(88%,19em);margin:0 auto;padding:.7em .8em 1em;
+  border-radius:.7em;
+  background:rgba(18,36,61,.96);
+  border:1px solid rgba(90,200,255,.46);
+  color:#ffffff;
+}
+.bt-step{font-size:.52em;font-weight:900;letter-spacing:.08em;color:var(--cyan)}
+.bt-img{
+  width:100%;max-height:11em;object-fit:contain;display:block;
+  border-radius:.45em;background:#0a1622;
+}
+.bt-tag{font-size:.5em;font-weight:900;color:#0a1622;background:var(--cyan);
+  padding:.2em .7em;border-radius:999px}
+.bt-title{font-size:.72em;font-weight:900;color:#ffffff;word-break:keep-all}
+.bt-desc{font-size:.56em;font-weight:500;line-height:1.55;color:rgba(235,244,255,.92);
+  word-break:keep-all}
+.bt-desc b{color:var(--lime)}
+.bt-go{margin-top:.3em;font-size:.7em;padding:.55em 1.3em}
+.bt-done{font-size:.72em;font-weight:900;color:var(--lime);padding:1.4em .4em}
+
+/* ===== clear =====
+   Desktop keeps the familiar centred panel. The scroller only earns its keep on
+   short screens, where the panel is taller than the viewport. */
+#scr-clear.active{display:block}
+.clear-scroll{
+  /* The overlay lives INSIDE #stage (16:9, letterboxed), so the scroller must be
+     the stage's size — 100dvh here would be the whole viewport and overflow it.
+     inset:0 gives exactly that; the dvh cap is a belt-and-braces guard for the
+     mobile address bar growing/shrinking. */
+  position:absolute; inset:0;
+  max-height:100vh; max-height:100dvh;
+  overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  /* body sets touch-action:none to stop the game scrolling the page — this pane
+     has to opt back in or it cannot be swiped on a phone */
+  touch-action:pan-y;
+  display:flex;
+  padding:.8em;
+  padding-bottom:calc(.8em + env(safe-area-inset-bottom));
+}
+/* margin:auto (not align-items:center) — a centred flex child taller than its
+   container gets its top clipped with no way to scroll to it. */
+.clear-panel{gap:.5em;margin:auto;max-width:min(94%,34em)}
+.clear-eyebrow{font-size:.7em;font-weight:800;color:var(--lime);letter-spacing:.2em}
+.clear-card{display:grid;grid-template-columns:1fr 1.3fr;gap:.7em;align-items:center;width:100%;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:.6em;padding:.5em}
+.clear-card img{width:100%;border-radius:.4em;display:block;object-fit:contain}
+.clear-facts{text-align:left;display:grid;gap:.3em}
+.clear-facts p{font-size:.68em;line-height:1.45;color:#cfe3f5;padding-left:.8em;position:relative;
+  word-break:keep-all;overflow-wrap:break-word}
+.clear-facts p::before{content:"●";position:absolute;left:0;color:var(--cyan);font-size:.6em;top:.35em}
+.clear-stats{display:flex;gap:.5em;font-size:.66em;color:var(--dim);flex-wrap:wrap;justify-content:center}
+.clear-stats b{color:var(--amber)}
+
+/* The button stays reachable no matter how far the content scrolls. */
+/* Solid, panel-wide bar rather than a floating pill: on a short screen the photo
+   scrolls underneath it, and a see-through button read as an accident. Negative
+   margins pull it out to the panel's edges so nothing peeks past the sides. */
+.clear-actions{
+  position:sticky; bottom:-1.2em; z-index:2;
+  /* .panel is a grid with justify-items:center, which shrink-wraps its children —
+     the bar has to opt out or it only covers the button's own width */
+  justify-self:stretch;
+  width:auto; display:flex; justify-content:center;
+  margin:.2em -1.4em -1.2em;
+  padding:.6em 1.4em calc(.6em + env(safe-area-inset-bottom));
+  /* fully opaque, not var(--panel)'s 93%: content scrolling underneath used to
+     ghost through behind the button */
+  background:#0a1426;
+  border-top:1px solid rgba(255,255,255,.10);
+  box-shadow:0 -10px 18px rgba(4,8,16,.55);
+  border-radius:0 0 var(--r) var(--r);
+}
+.clear-actions .btn{
+  min-height:48px;                 /* comfortable touch target */
+  max-width:100%; padding:.6em 1.6em;
+  white-space:nowrap;
+}
+
+@media (max-width:560px){
+  /* photo above text instead of beside it, so neither gets squeezed */
+  .clear-card{grid-template-columns:1fr;gap:.5em}
+  .clear-card img{max-height:30vh;margin:0 auto}
+  .clear-panel{max-width:100%}
+}
+@media (max-height:520px){
+  /* phone landscape: shrink the photo, never the words */
+  .clear-card img{max-height:34vh}
+  .clear-scroll{align-items:flex-start;padding:.5em .6em}
+  .clear-scroll{padding-bottom:calc(.6em + env(safe-area-inset-bottom))}
+}
+
+/* ===== ending ===== */
+#scr-ending{overflow:hidden}
+.ending-scroll{width:100%;height:100%;overflow-y:auto;display:grid;place-items:center;padding:1em 0;
+  background:radial-gradient(circle at 50% 30%,#153a55,#050a14 70%)}
+/* Badge art is normalised at build time to a square canvas with the emblem at a
+   constant 86% — the raw PNGs ranged from 46% to 100% ink, so a fixed CSS width
+   made some badges look half the size of others. */
+.badge-row{display:flex;gap:.5em;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.badge-row figure{width:5.2em;display:grid;justify-items:center;gap:.25em}
+.badge-row img{
+  width:5.2em;height:5.2em;object-fit:contain;display:block;
+  filter:drop-shadow(0 0 12px rgba(57,224,255,.6));
+}
+.badge-row figcaption{font-size:.55em;font-weight:800;color:var(--dim);
+  text-align:center;word-break:keep-all;line-height:1.3;min-height:2.4em}
+.ending-block{display:grid;gap:.35em;width:100%}
+.ending-block .case{display:flex;gap:.5em;align-items:center;text-align:left;font-size:.68em;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:.5em;padding:.4em .6em}
+.ending-block .case img{width:3.4em;border-radius:.3em}
+.ending-block .case b{color:var(--lime)}
+.card-row{display:flex;gap:.4em;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.card-row figure{width:5.4em}
+/* fixed ratio: source photos vary, and raw heights made the row ragged */
+.card-row img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:.35em;
+  border:1px solid var(--edge);display:block}
+.card-row figcaption{font-size:.5em;color:var(--dim);margin-top:.15em;text-align:center}
+.card-row .card-locked{width:5.4em;display:grid;gap:.15em}
+.card-row .miss{width:100%;aspect-ratio:4/3;border-radius:.35em;
+  border:1px dashed rgba(255,255,255,.28);background:rgba(255,255,255,.04);
+  display:grid;place-items:center;color:rgba(255,255,255,.4);font-size:1.1em}
+/* sizes here are relative to figcaption's own .5em — stating them in em again
+   would compound to a quarter of the intended size and be unreadable */
+.card-row .card-locked figcaption{display:grid;gap:.1em;margin-top:.15em}
+.card-row .card-locked b{font-size:1.15em;font-weight:800;color:rgba(235,244,255,.82);
+  word-break:keep-all;line-height:1.3}
+.card-row .card-locked span{font-size:1em;color:rgba(235,244,255,.5);
+  word-break:keep-all;line-height:1.3}
+.cards-note{font-size:.6em;font-weight:800;color:var(--dim);word-break:keep-all;text-align:center}
+.cards-note.all{color:var(--lime)}
+/* honest stand-in: there is no biotech_fungi_medicine artwork in the project */
+.med-card{width:3.4em;border-radius:.3em;background:linear-gradient(180deg,#f3ead6,#dcd0b4);
+  border:1px solid rgba(90,200,255,.46);display:grid;place-items:center;padding:.2em}
+.med-card svg{width:100%;height:auto;display:block}
+.ending-stats{font-size:.7em;color:var(--dim)}
+.ending-stats b{color:var(--amber)}
+
+/* text-only ending cases (왜냐면 과학실): no photo column, so the sentence gets the
+   whole width instead of sitting next to an empty 3.4em box */
+.ending-block .case-text{display:block}
+.ending-block .case-text p{line-height:1.5;word-break:keep-all}
+/* a card whose artwork never arrived keeps its caption and loses its frame */
+.card-row .card-noart{display:grid;place-items:center;min-height:3.2em;
+  border:1px dashed rgba(255,255,255,.24);border-radius:.35em;
+  background:rgba(255,255,255,.04);padding:.3em}
+
+/* ===== character select =====
+   Three cards, chosen before the first stage. The layout has to survive a phone in
+   landscape (three cards across a 375px-tall viewport), so the art box is capped
+   against viewport height, not em. */
+.char-panel{gap:.5em}
+.char-eyebrow{font-size:.6em;font-weight:800;color:var(--cyan);letter-spacing:.12em;
+  word-break:keep-all}
+.char-note{font-size:.58em;color:#cfe3f5;line-height:1.45;word-break:keep-all;
+  text-align:center;min-height:2.4em;max-width:26em}
+.char-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5em;width:100%}
+.ccard{
+  --cc:#65f2d3;
+  font:inherit;color:var(--ink);cursor:pointer;text-align:center;
+  display:grid;gap:.35em;padding:.5em .4em;
+  border-radius:.7em;border:1px solid var(--edge);
+  background:linear-gradient(180deg,rgba(20,44,78,.9),rgba(8,18,36,.92));
+  transition:transform .1s,border-color .12s,box-shadow .14s;
+}
+.ccard:hover,.ccard:focus-visible{outline:none;transform:translateY(-2px);
+  border-color:var(--cc)}
+.ccard.sel{border-color:var(--cc);
+  box-shadow:0 0 0 2px var(--cc) inset,0 0 20px color-mix(in srgb,var(--cc) 45%,transparent)}
+/* color-mix is recent; this keeps the selected state obvious without it */
+@supports not (color:color-mix(in srgb,red,blue)){
+  .ccard.sel{box-shadow:0 0 0 2px var(--cc) inset,0 0 20px rgba(101,242,211,.45)}
+}
+.ccard-art{
+  width:100%;aspect-ratio:3/4;max-height:34vh;
+  border-radius:.5em;overflow:hidden;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+  display:grid;place-items:center;
+}
+.ccard-art img{width:100%;height:100%;object-fit:cover;display:block}
+/* portrait missing: the character's initial on their own colour, still selectable */
+.ccard-art.noart{font-size:2.2em;font-weight:900;color:var(--cc);
+  background:radial-gradient(circle at 50% 35%,rgba(255,255,255,.14),transparent 70%)}
+.ccard-body{display:grid;gap:.1em}
+.cc-type{font-size:.5em;font-weight:800;color:var(--cc);letter-spacing:.06em}
+.cc-name{font-size:.82em;font-weight:900;color:#fff;word-break:keep-all}
+.cc-perk{font-size:.5em;color:rgba(228,240,255,.7);word-break:keep-all;line-height:1.3}
+
+@media (max-width:560px){
+  .cc-perk{display:none}
+  .char-grid{gap:.35em}
+}
+/* phone landscape: cards go side-by-side and lose their art rather than their names */
+@media (max-height:430px){
+  .char-panel{padding:.6em .8em;gap:.3em}
+  .char-panel h2{font-size:.95em}
+  .char-eyebrow{display:none}
+  .char-note{min-height:1.6em;font-size:.52em}
+  .ccard{grid-template-columns:auto 1fr;align-items:center;text-align:left;gap:.45em}
+  .ccard-art{width:3.4em;aspect-ratio:1;max-height:none}
+  .cc-perk{display:block;font-size:.46em}
+}
+
+/* ===== ordering mission (응급처치 순서) =====
+   Slots on top, pool underneath. Deliberately click-to-place rather than
+   drag-and-drop: dragging is unreliable on a classroom trackpad and impossible to
+   do accurately on a phone while the game is running. */
+.order-wrap{display:grid;gap:.45em;justify-items:center;width:100%}
+.order-slots{display:grid;gap:.3em;width:100%}
+.order-slot{
+  display:flex;align-items:center;gap:.45em;
+  min-height:2.5em;padding:.35em .55em;border-radius:.5em;
+  border:1px dashed rgba(255,255,255,.26);background:rgba(255,255,255,.04);
+  transition:border-color .15s,background .15s;
+}
+.order-slot.filled{border-style:solid;border-color:rgba(101,242,211,.5);
+  background:rgba(101,242,211,.10)}
+.order-slot.ok{border-color:var(--lime);background:rgba(182,255,103,.14)}
+.order-slot.bad{border-color:var(--rose);background:rgba(255,93,122,.12)}
+.order-num{flex:0 0 auto;font-size:.8em;font-weight:900;color:var(--cyan);font-style:normal}
+.order-slot-txt{font-size:.6em;font-weight:800;color:#fff;word-break:keep-all;
+  line-height:1.35;display:flex;align-items:center;gap:.4em}
+.order-slot-txt i{font-style:normal;font-size:1.3em}
+.order-slot-txt.ph{color:rgba(255,255,255,.34);font-weight:600}
+
+.order-pool{display:grid;grid-template-columns:repeat(3,1fr);gap:.35em;width:100%}
+.order-card{
+  font:inherit;color:var(--ink);cursor:pointer;text-align:center;
+  display:grid;gap:.2em;justify-items:center;padding:.45em .3em;
+  border-radius:.55em;border:1px solid var(--edge);
+  background:linear-gradient(180deg,rgba(20,44,78,.95),rgba(8,18,36,.95));
+  transition:transform .08s,border-color .12s,box-shadow .12s;
+}
+.order-card em{font-style:normal;font-size:1.35em;line-height:1}
+.order-card span{font-size:.5em;font-weight:800;word-break:keep-all;line-height:1.3}
+.order-card:hover,.order-card:focus-visible,.order-card.sel{
+  outline:none;border-color:var(--cyan);transform:translateY(-1px);
+  box-shadow:0 0 16px rgba(57,224,255,.4)}
+.order-card[disabled]{opacity:.4;pointer-events:none}
+.order-tools{display:flex;gap:.4em;justify-content:center}
+
+@media (max-height:430px){
+  .order-wrap{gap:.25em}
+  .order-slot{min-height:2em;padding:.22em .45em}
+  .order-slot-txt{font-size:.54em}
+  .order-card{padding:.3em .25em}
+  .order-card em{font-size:1.1em}
+}
+
+/* ===== fade ===== */
+#fade{position:absolute;inset:0;background:#04070e;z-index:40;pointer-events:none;opacity:0;
+  transition:opacity .3s ease}
+#fade.on{opacity:1}
+
+/* ===== rotate tip ===== */
+#rotate-tip{display:none}
+@media (max-aspect-ratio:1/1) and (max-height:520px){
+  #rotate-tip{display:none}
+}
+@media (orientation:portrait){
+  #rotate-tip{display:block;position:fixed;bottom:.6em;left:0;right:0;text-align:center;
+    font-size:11px;color:var(--dim);z-index:2;pointer-events:none}
+}
