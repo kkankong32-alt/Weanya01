@@ -1043,10 +1043,18 @@ body{
    Only these panels escape; the game canvas keeps its letterbox. z-index stays
    under #fade (40) so screen transitions still cover them. */
 @media (orientation:portrait), (max-height:430px){
-  #scr-charselect.active, #scr-worlds.active, #scr-controls.active,
-  #scr-sound.active, #scr-pause.active, #scr-mission.active,
-  #scr-clear.active, #scr-ending.active, #scr-error.active{
-    position:fixed; inset:0; z-index:35;
+  /* Two tiers, mirroring the normal stacking: base screens (.screen, z-index 5)
+     stay under dialogs that open ON TOP of something (.screen.overlay, z-index 30).
+     Giving every escaped screen one z-index would flatten that and let DOM order
+     decide instead — a mission opened over another screen could end up behind it.
+     Both tiers stay under #fade (40) so transitions still cover them. */
+  #scr-charselect.active, #scr-worlds.active, #scr-ending.active{
+    position:fixed; inset:0; z-index:34;
+    max-height:100vh; max-height:100dvh;
+  }
+  #scr-controls.active, #scr-sound.active, #scr-pause.active,
+  #scr-mission.active, #scr-clear.active, #scr-error.active{
+    position:fixed; inset:0; z-index:38;
     max-height:100vh; max-height:100dvh;
   }
 }
